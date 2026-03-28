@@ -701,7 +701,7 @@ function stopMusic() {
 - Start music on SPACE (start game) if `musicEnabled`
 - On pause → `stopMusic()` (via `pauseMuted`)
 - On unpause → `startMusic()` if `musicEnabled`
-- On M press → toggle `musicEnabled`, start/stop immediately
+- On M press → toggle `musicEnabled`; start/stop music immediately **except on start screen** (where it only toggles the flag — music begins on first SPACE)
 - On game-over/win → music continues (M still toggles)
 
 **Test:** Music plays during gameplay. Stops on pause. M toggles on all screens. Music state persists across restarts.
