@@ -760,7 +760,7 @@ Verify every key works correctly on every screen:
 |-------|--------|----------|---------|--------|-----------|-----|----------------|
 | Arrows/WASD | ignored | ignored | buffer direction | ignored (not buffered) | ignored | ignored | ignored (not buffered) |
 | SPACE | lockGrid, start game + menu SFX | ignored | ignored | ignored | restart + menu SFX | restart + menu SFX | ignored |
-| P     | ignored | ignored | set userPaused, flush buffer, pauseMuted, stop music | clear userPaused, clear pauseMuted, resume music if musicEnabled | ignored | ignored | ignored |
+| P     | ignored | ignored | set userPaused, flush buffer, pauseMuted, stop music | clear userPaused, clear pauseMuted, resume music if musicEnabled | ignored | ignored | toggle userPaused (preserves independently of resizeBlocked; game stays halted until both are false) |
 | M     | initAudio, toggle musicEnabled, immediate start/stop + menu SFX | ignored | toggle + immediate effect + menu SFX | toggle musicEnabled only (silent, pauseMuted active) + menu SFX | toggle + immediate effect + menu SFX | toggle + immediate effect + menu SFX | ignored |
 | click | initAudio | initAudio | initAudio | initAudio | initAudio | initAudio | initAudio |
 
