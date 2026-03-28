@@ -208,6 +208,7 @@ document.addEventListener('keydown', (e) => { ... });
   - **P**:
     - `playing` → set `userPaused = true`, `pauseMuted = true`, flush input buffer, stop music, clear tick timer, set `screen = 'paused'`
     - `paused` → set `userPaused = false`, `pauseMuted = false`, resume music if `musicEnabled`, restart tick loop, set `screen = 'playing'`
+    - `resizeBlocked` → toggle `userPaused` (and `pauseMuted` accordingly). Game stays halted because `resizeBlocked` is still true. When resize recovers, the game will check `userPaused` to decide whether to resume or show the pause screen
     - Other screens → ignored
   - **M** (works on ALL screens except `tooSmall` and `resizeBlocked`):
     - Call `initAudio()` (this may be the first user gesture)
