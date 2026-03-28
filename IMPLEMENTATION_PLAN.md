@@ -717,10 +717,13 @@ case 'KeyM':
   initAudio();  // ensure AudioContext exists
   playSFX('menu');
   state.musicEnabled = !state.musicEnabled;
-  if (state.musicEnabled && !state.pauseMuted) {
-    startMusic();
-  } else {
-    stopMusic();
+  // Only start/stop music if not on start screen (music begins on first SPACE)
+  if (state.screen !== 'start') {
+    if (state.musicEnabled && !state.pauseMuted && !state.resizeMuted) {
+      startMusic();
+    } else {
+      stopMusic();
+    }
   }
   render();  // update HUD music indicator
   break;
