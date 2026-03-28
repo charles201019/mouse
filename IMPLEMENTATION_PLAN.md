@@ -762,7 +762,7 @@ Verify every key works correctly on every screen:
 | SPACE | lockGrid, start game + menu SFX | ignored | ignored | ignored | restart + menu SFX | restart + menu SFX | ignored |
 | P     | ignored | ignored | set userPaused, flush buffer, pauseMuted, stop music | clear userPaused, clear pauseMuted, resume music if musicEnabled | ignored | ignored | ignored |
 | M     | initAudio, toggle musicEnabled, immediate start/stop + menu SFX | ignored | toggle + immediate effect + menu SFX | toggle musicEnabled only (silent, pauseMuted active) + menu SFX | toggle + immediate effect + menu SFX | toggle + immediate effect + menu SFX | ignored |
-| click | initAudio | — | initAudio | initAudio | initAudio | initAudio | initAudio |
+| click | initAudio | initAudio | initAudio | initAudio | initAudio | initAudio | initAudio |
 
 **Audio suppression flags:**
 | State | `pauseMuted` | `resizeMuted` | Music plays? | SFX play? |
