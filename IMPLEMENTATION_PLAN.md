@@ -605,7 +605,7 @@ function initAudio() {
 - In the keydown/click handler, call `initAudio()` on any interaction
 - If `audioCtx.state === 'suspended'` → call `audioCtx.resume()`
 
-**Test:** AudioContext initializes on first keypress. No console warnings about autoplay.
+**Test:** AudioContext initializes on first user gesture (keypress or click). No console warnings about autoplay. Clicking the canvas before any keypress also initializes audio.
 
 ---
 
@@ -615,7 +615,7 @@ function initAudio() {
 
 ```js
 function playSFX(type) {
-  if (!state.audioCtx || state.pauseMuted) return;
+  if (!state.audioCtx || state.pauseMuted || state.resizeMuted) return;
   const ctx = state.audioCtx;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
