@@ -189,11 +189,11 @@ This document defines all manual test cases for the Mouse game, organized by fea
 **Expected:** At least 10 empty cells (or 10% of total empty, whichever is smaller) remain reachable. Cheese cell excluded from count.
 
 ### T6.6 — Deferred obstacle
-**Steps:** Create a scenario where obstacle placement fails all 10 retries (e.g., very crowded board).
+**Steps:** Create a scenario where obstacle placement fails all 10 retries (e.g., very crowded board). *Note: Use a small grid (e.g., `MIN_GRID = 5`) or debug tooling to create a crowded board where placement retries are likely to fail.*
 **Expected:** Obstacle spawn is deferred. `pendingObstacles` counter increments. On the next cheese eaten, one deferred obstacle is attempted.
 
 ### T6.7 — One deferred per cheese
-**Steps:** Accumulate 3+ deferred obstacles.
+**Steps:** Accumulate 3+ deferred obstacles. *Note: Use the same small-grid approach as T6.6 to force multiple deferrals.*
 **Expected:** Only one deferred obstacle is resolved per cheese eaten. No sudden burst.
 
 ### T6.8 — Obstacle cap (5% of grid)
@@ -203,6 +203,10 @@ This document defines all manual test cases for the Mouse game, organized by fea
 ### T6.9 — Obstacle SFX
 **Steps:** Trigger obstacle placement with audio enabled.
 **Expected:** Low thud sound plays for both on-threshold and deferred placements.
+
+### T6.10 — Cheese spawns before obstacle in post-eat
+**Steps:** Eat the 5th cheese (triggering both cheese spawn and obstacle spawn). Observe the board.
+**Expected:** New cheese is already on the board when the obstacle is placed. The obstacle's BFS validates reachability to the *new* cheese, not the old one.
 
 ---
 
@@ -233,7 +237,7 @@ This document defines all manual test cases for the Mouse game, organized by fea
 ## 8. Win Condition
 
 ### T8.1 — Win trigger
-**Steps:** Fill the entire grid (mouse body + obstacles occupy all cells so no cheese can spawn).
+**Steps:** Fill the entire grid (mouse body + obstacles occupy all cells so no cheese can spawn). *Note: This is nearly impossible on a standard grid. To test manually, temporarily set `MIN_GRID = 5` and `PREFERRED_CELL_SIZE` accordingly to create a tiny 5x5 board, or add a debug key that fills the grid. Alternatively, verify via code inspection that the win check fires when `spawnCheese()` returns null.*
 **Expected:** Game transitions to win screen.
 
 ### T8.2 — Win screen content
@@ -254,7 +258,7 @@ This document defines all manual test cases for the Mouse game, organized by fea
 
 ### T9.1 — High score persistence
 **Steps:** Score 100 points. Close and reopen the browser.
-**Expected:** High score of 100 is displayed on HUD and start screen (if shown).
+**Expected:** High score of 100 is displayed on HUD. Also visible on game-over and win screens.
 
 ### T9.2 — High score update on game over
 **Steps:** Score higher than existing high score, then die.
@@ -290,7 +294,7 @@ This document defines all manual test cases for the Mouse game, organized by fea
 
 ### T10.3 — Pause screen
 **Steps:** Press P during gameplay.
-**Expected:** Semi-transparent overlay with "PAUSED" and "P to resume . M to toggle music". Game is frozen.
+**Expected:** Semi-transparent overlay with "PAUSED" and "P to resume · M to toggle music". Game is frozen.
 
 ### T10.4 — Unpause
 **Steps:** Press P while paused.
@@ -350,11 +354,11 @@ This document defines all manual test cases for the Mouse game, organized by fea
 
 ### T11.8 — P during resize-block
 **Steps:** Press P during resize-block while game was playing.
-**Expected:** `userPaused` toggled. When resize recovers, pause screen shows instead of resuming.
+**Expected:** `userPaused` toggled to true. `pauseMuted` set to true accordingly. When resize recovers, pause screen shows instead of resuming. Audio remains suppressed (both `pauseMuted` and `resizeMuted` were active; after recovery `resizeMuted` clears but `pauseMuted` persists).
 
 ### T11.9 — P during resize-block (already paused)
 **Steps:** Pause the game, then trigger resize-block, then press P.
-**Expected:** `userPaused` is cleared. When resize recovers, game resumes playing.
+**Expected:** `userPaused` is cleared. `pauseMuted` is cleared accordingly. When resize recovers, game resumes playing. Music resumes if `musicEnabled` is true (since neither `pauseMuted` nor `resizeMuted` remain active).
 
 ### T11.10 — Arrows ignored on non-playing screens
 **Steps:** Press arrow keys on start, tooSmall, paused, game-over, win screens.
@@ -364,13 +368,13 @@ This document defines all manual test cases for the Mouse game, organized by fea
 **Steps:** Press arrow keys during resize-block.
 **Expected:** Inputs are ignored and not buffered. No stale turns on recovery.
 
-### T11.12 — M ignored on tooSmall
+### T11.12 — M on tooSmall
 **Steps:** Press M on "Screen too small" screen.
-**Expected:** Nothing happens.
+**Expected:** Music toggle is ignored (`musicEnabled` does not change). However, AudioContext may initialize if this is the first user gesture.
 
-### T11.13 — M ignored during resize-block
+### T11.13 — M during resize-block
 **Steps:** Press M during resize-block.
-**Expected:** Nothing happens.
+**Expected:** Music toggle is ignored (`musicEnabled` does not change). However, AudioContext may initialize if this is the first user gesture.
 
 ---
 
@@ -405,16 +409,24 @@ This document defines all manual test cases for the Mouse game, organized by fea
 **Expected:** Quick blip sound. Best-effort on first gesture.
 
 ### T12.8 — SFX suppressed during pause
-**Steps:** Pause the game. Attempt actions that would normally trigger SFX.
-**Expected:** No sound plays. `pauseMuted` is true.
+**Steps:** Pause the game. Press M (which normally plays menu select SFX).
+**Expected:** No menu select sound plays. `pauseMuted` suppresses all SFX.
 
 ### T12.9 — SFX suppressed during resize-block
-**Steps:** Trigger resize-block. Attempt actions that would normally trigger SFX.
-**Expected:** No sound plays. `resizeMuted` is true.
+**Steps:** Trigger resize-block. Press P (which is allowed during resize-block). Verify no SFX plays for any internal event.
+**Expected:** No sound plays. `resizeMuted` suppresses all SFX. Note: M is ignored during resize-block, so this test verifies the flag is set correctly for any code path that calls `playSFX()`.
 
 ### T12.10 — SFX resume after unpause
 **Steps:** Pause, then unpause. Eat cheese.
 **Expected:** Eat SFX plays normally.
+
+### T12.11 — Game-over SFX plays with music disabled
+**Steps:** Press M to disable music during gameplay. Then trigger game over.
+**Expected:** Game-over descending buzz still plays. SFX are independent of `musicEnabled` — only `pauseMuted` and `resizeMuted` suppress them.
+
+### T12.12 — SFX resume after resize-block recovery
+**Steps:** Trigger resize-block. Recover by expanding the window. Eat cheese.
+**Expected:** Eat SFX plays normally. `resizeMuted` is cleared on recovery.
 
 ---
 
@@ -483,6 +495,10 @@ This document defines all manual test cases for the Mouse game, organized by fea
 ### T13.16 — Music is a looping chiptune
 **Steps:** Let the game play for 30+ seconds with music enabled.
 **Expected:** Music loops seamlessly. 4-bar pattern at ~120 BPM.
+
+### T13.17 — `musicEnabled` defaults to true on first load
+**Steps:** Clear localStorage. Load the game for the first time. Observe the HUD.
+**Expected:** Music note icon in HUD is filled (indicating `musicEnabled = true`). Music will start when SPACE is pressed.
 
 ---
 
@@ -598,32 +614,34 @@ Run these after each implementation phase to catch regressions:
 - [ ] T1.1, T1.6 — Grid renders and locks
 - [ ] T2.1-T2.9 — Movement and input
 - [ ] T3.1-T3.5 — Wall wrapping
-- [ ] T4.1-T4.3 — Cheese spawn and eat
+- [ ] T4.1-T4.5 — Cheese spawn, eat, distance, and score
 - [ ] T5.1, T5.3 — Self-collision and tail chase
 
 ### After Phase 2 (Progression)
 - [ ] T7.1-T7.5 — Speed and scoring
 - [ ] T6.1-T6.8 — Obstacles and BFS
 - [ ] T9.1-T9.4 — High score
-- [ ] T8.1 — Win trigger
+- [ ] T8.1-T8.3 — Win trigger, screen content, high score (T8.4 particles deferred to Phase 3)
 - [ ] All Phase 1 regression tests
 
 ### After Phase 3 (Polish)
 - [ ] T14.1-T14.6 — Sprites
 - [ ] T15.1-T15.5 — Particles
+- [ ] T4.6 — Eat particle effect (deferred from Phase 1)
+- [ ] T8.4 — Win celebration particles (deferred from Phase 2)
 - [ ] T10.1-T10.9 — Screen overlays
 - [ ] T16.1-T16.6 — Resize-block
 - [ ] All Phase 1-2 regression tests
 
 ### After Phase 4 (Audio)
-- [ ] T12.1-T12.10 — SFX
-- [ ] T13.1-T13.16 — Music
+- [ ] T12.1-T12.12 — SFX
+- [ ] T13.1-T13.17 — Music
 - [ ] All Phase 1-3 regression tests
 
 ### Final (Phase 5)
 - [ ] T11.1-T11.13 — All state transitions
 - [ ] T17.1-T17.5 — Performance
-- [ ] Full regression of all 100+ tests
+- [ ] Full regression of all 111 tests
 
 ---
 
@@ -636,17 +654,17 @@ Run these after each implementation phase to catch regressions:
 | 3. Wall Wrapping | T3.1-T3.5 | All 4 edges + wrap while growing |
 | 4. Cheese | T4.1-T4.6 | Spawn, eat, distance, score, particles |
 | 5. Collision | T5.1-T5.7 | Self, obstacle, tail chase, game-over |
-| 6. Obstacles | T6.1-T6.9 | Spawn, safety, BFS, defer, cap, SFX |
+| 6. Obstacles | T6.1-T6.10 | Spawn, safety, BFS, defer, cap, SFX, ordering |
 | 7. Speed & Scoring | T7.1-T7.5 | Formula, decrease, cap, HUD |
 | 8. Win Condition | T8.1-T8.4 | Trigger, screen, high score, particles |
 | 9. High Score | T9.1-T9.6 | Persistence, update, display |
 | 10. Screens | T10.1-T10.9 | Start, pause, game-over, win, resize-block |
 | 11. State Transitions | T11.1-T11.13 | Key behavior on every screen |
-| 12. Audio | T12.1-T12.10 | Init, SFX, suppression, resume |
-| 13. Music | T13.1-T13.16 | Toggle, pause, resize, persist |
+| 12. Audio | T12.1-T12.12 | Init, SFX, suppression, resume, independence |
+| 13. Music | T13.1-T13.17 | Toggle, pause, resize, persist, default |
 | 14. Visual | T14.1-T14.6 | Sprites, scaling, orientation, HUD |
 | 15. Particles | T15.1-T15.5 | Eat, death, win, cleanup |
 | 16. Resize-Block | T16.1-T16.6 | Buffer, state independence, grid lock |
 | 17. Performance | T17.1-T17.5 | Timers, rAF, BFS, audio, particles |
 | 18. Regression | Checklists | Per-phase regression gates |
-| **Total** | **107 tests** | |
+| **Total** | **111 tests** | |
