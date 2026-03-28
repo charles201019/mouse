@@ -82,10 +82,12 @@ const OPPOSITES = { UP:'DOWN', DOWN:'UP', LEFT:'RIGHT', RIGHT:'LEFT' };
 **Game state object:**
 ```js
 let state = {
-  screen: 'start',        // 'start' | 'playing' | 'paused' | 'gameover' | 'win'
+  screen: 'start',        // 'start' | 'playing' | 'paused' | 'gameover' | 'win' | 'tooSmall'
   gridWidth: 0,
   gridHeight: 0,
   cellSize: 0,
+  lockedCanvasWidth: 0,   // pixel width of canvas, locked when game starts
+  lockedCanvasHeight: 0,  // pixel height of canvas, locked when game starts
   body: [],                // array of {x, y}, head is index 0
   effectiveDirection: 'RIGHT',
   inputBuffer: [],
@@ -101,6 +103,7 @@ let state = {
   pauseMuted: false,
   userPaused: false,
   resizeBlocked: false,
+  resizeMuted: false,       // audio suppression during resize-block
   growing: false,
   tickTimer: null,
   particles: [],
@@ -131,14 +134,35 @@ let state = {
 1. Set `canvas.width = cols * cellSize`, `canvas.height = rows * cellSize + HUD_HEIGHT`
 2. Center canvas via CSS
 
-**Implement `window.onresize` handler:**
-- If `state.screen === 'start'` → recompute grid and re-render
-- If game is active → check if viewport can still fit locked canvas size
-  - If not → set `resizeBlocked = true`, flush input buffer, show overlay
-  - If recovered → clear `resizeBlocked`, resume only if `!userPaused`
-- Always re-center canvas
+**Implement `lockGrid()`:**
+- Called once when the game transitions from `start` → `playing`
+- `state.lockedCanvasWidth = state.gridWidth * state.cellSize`
+- `state.lockedCanvasHeight = state.gridHeight * state.cellSize + HUD_HEIGHT`
+- From this point, `gridWidth`, `gridHeight`, and `cellSize` are immutable until reset
 
-**Test:** Resize browser window. Canvas resizes on start screen, stays locked during game. "Screen too small" appears on tiny viewports.
+**Implement `window.onresize` handler:**
+- If `state.screen === 'start'` or `state.screen === 'tooSmall'`:
+  - Recompute grid via `computeGrid()` and re-render
+  - If grid now fits → set `state.screen = 'start'` (recover from tooSmall)
+  - If still too small → set `state.screen = 'tooSmall'`
+- If game is active (`playing`, `paused`, `gameover`, `win`):
+  - Do **not** call `computeGrid()` — grid dimensions are locked
+  - Compare `window.innerWidth < state.lockedCanvasWidth` or `window.innerHeight < state.lockedCanvasHeight`
+  - If viewport is too small:
+    - `state.resizeBlocked = true`
+    - `state.inputBuffer = []` (flush)
+    - `clearTimeout(state.tickTimer)` (halt game loop)
+    - Suppress audio (apply `pauseMuted` behavior — see Finding 4)
+    - If viewport < 150x190 → show "Screen too small" text variant
+    - Else → show "Window too small — resize to continue"
+  - If viewport has recovered and `resizeBlocked` was true:
+    - `state.resizeBlocked = false`
+    - Restore audio (clear resize audio suppression)
+    - If `!state.userPaused` and `state.screen === 'playing'` → restart tick loop
+    - Else → remain on current screen (paused, gameover, or win)
+- Always re-center canvas via CSS (do not resize it)
+
+**Test:** Resize browser window. Canvas resizes on start screen, stays locked during game. "Screen too small" appears on tiny viewports. Recovering from tooSmall on start screen works. Mid-game resize-block activates/deactivates correctly. Grid never changes during play.
 
 ---
 
@@ -175,7 +199,24 @@ document.addEventListener('keydown', (e) => { ... });
 - Map arrow keys and WASD to direction names (`UP`, `DOWN`, `LEFT`, `RIGHT`)
 - If `state.screen === 'playing'` and key is a direction:
   - If `inputBuffer.length < INPUT_BUFFER_CAP` → push direction
-- Handle SPACE, P, M keys based on current screen (stub for now)
+- Handle SPACE, P, M keys based on current screen:
+  - **SPACE**:
+    - `start` → call `initAudio()`, `lockGrid()`, `initMouse()`, `spawnCheese()`, set `screen = 'playing'`, start tick loop, start music if `musicEnabled`, play menu SFX (best-effort)
+    - `gameover` / `win` → reset state, same as start
+    - Other screens → ignored
+  - **P**:
+    - `playing` → set `userPaused = true`, `pauseMuted = true`, flush input buffer, stop music, clear tick timer, set `screen = 'paused'`
+    - `paused` → set `userPaused = false`, `pauseMuted = false`, resume music if `musicEnabled`, restart tick loop, set `screen = 'playing'`
+    - Other screens → ignored
+  - **M** (works on ALL screens except `tooSmall` and `resizeBlocked`):
+    - Call `initAudio()` (this may be the first user gesture)
+    - Toggle `state.musicEnabled`
+    - Play menu SFX (best-effort)
+    - If currently playing or on start screen: start/stop music immediately based on new `musicEnabled` value
+    - If paused: only toggle `musicEnabled` (music stays silent due to `pauseMuted`, will apply on unpause)
+    - If game-over / win: start/stop music immediately
+    - Re-render to update HUD music indicator
+- Also add a `click` listener on `document` that calls `initAudio()` (ensures AudioContext initializes on click as well as keypress, per design)
 
 **Implement `processInput()`:**
 1. While `inputBuffer` is not empty:
@@ -376,14 +417,28 @@ Already implemented in step 1.5 post-eat logic. This step is verification:
 
 ---
 
-### Step 2.4 — High Score with localStorage
+### Step 2.4 — High Score & Win Path Completeness
 
-Already implemented in step 2.1. This step adds:
+Already implemented in step 2.1. This step adds win-path parity:
 
 **Update win condition:**
-- On win, also check/update high score
+- On win, check/update high score (same logic as game-over)
+- Set `state.screen = 'win'`
 
-**Test:** High score updates on game-over and win. Persists across reloads. Displayed on HUD, game-over, and win screens.
+**Implement basic win screen (placeholder until Phase 3 polish):**
+- Draw overlay with "YOU WIN!" text
+- Show final score and high score
+- If new high score → show "NEW HIGH SCORE!" text
+- Show hint: "SPACE to restart · M to toggle music"
+- This ensures the win path is fully functional after Phase 2, matching the design's requirements. Phase 3 will add pixel art, enhanced celebrations, and visual polish
+
+**Implement basic game-over screen (placeholder until Phase 3 polish):**
+- Draw overlay with "GAME OVER" text
+- Show final score and high score
+- If new high score → show "NEW HIGH SCORE!" text
+- Show hint: "SPACE to restart · M to toggle music"
+
+**Test:** High score updates on game-over and win. Persists across reloads. Displayed on HUD, game-over, and win screens. Win screen shows all required info. Game-over screen shows all required info. Both screens are fully playable (SPACE restarts, M toggles music).
 
 ---
 
@@ -495,22 +550,23 @@ All overlays are semi-transparent dark rectangles drawn on the canvas with cente
 
 ### Step 3.4 — Resize-Block Overlay
 
-**Implement resize-block logic in `window.onresize`:**
-1. If game is active and viewport < locked canvas size:
-   - `state.resizeBlocked = true`
-   - `state.inputBuffer = []` (flush)
-   - `clearTimeout(state.tickTimer)` (halt game loop)
-2. If viewport recovers:
-   - `state.resizeBlocked = false`
-   - If `!state.userPaused` → restart tick loop
-   - Else → stay on pause screen
-3. Re-center canvas in both cases
+The core resize-block logic is already implemented in the `window.onresize` handler from Step 1.2. This step adds the visual overlay and audio integration.
+
+**Resize-block audio behavior:**
+- On entering resize-block: suppress all audio the same way pause does — stop music, prevent SFX. Internally, set a `resizeMuted` flag (analogous to `pauseMuted`). The `playSFX()` function should check: `if (state.pauseMuted || state.resizeMuted) return`
+- On exiting resize-block: clear `resizeMuted`. Music resumes only if `musicEnabled` is true AND `pauseMuted` is false (i.e., the player wasn't also manually paused). SFX resume based on the same conditions
+- `resizeMuted` is independent of `pauseMuted` — both can be true simultaneously if the player paused and then resized
+
+**Add `resizeMuted` to state object** (in Step 1.1):
+```js
+resizeMuted: false,       // audio suppression during resize-block
+```
 
 **"Screen too small" variant:**
 - If viewport < 150x190 → show "Screen too small" text instead of "Window too small"
-- Uses same `resizeBlocked` flag
+- Uses same `resizeBlocked` flag, same `resizeMuted` audio behavior
 
-**Test:** Shrink window during game → game pauses with overlay. Expand → game resumes (unless manually paused). Extreme shrink shows "Screen too small."
+**Test:** Shrink window during game → game pauses with overlay, audio stops. Expand → game resumes (unless manually paused), audio resumes correctly. Pause then resize → both states preserved, audio stays silent. Unpause after resize recovery → audio resumes. Extreme shrink shows "Screen too small."
 
 ---
 
@@ -699,12 +755,22 @@ Run through the complete 9-step tick loop and verify each step:
 
 Verify every key works correctly on every screen:
 
-| Key   | Start  | Playing | Paused | Game Over | Win | Resize-Blocked |
-|-------|--------|---------|--------|-----------|-----|----------------|
-| Arrows/WASD | ignored | buffer direction | ignored (not buffered) | ignored | ignored | ignored (not buffered) |
-| SPACE | start game + menu SFX | ignored | ignored | restart + menu SFX | restart + menu SFX | ignored |
-| P     | ignored | set userPaused, flush buffer, pauseMuted | clear userPaused, clear pauseMuted | ignored | ignored | ignored |
-| M     | toggle musicEnabled + menu SFX | toggle + immediate effect | toggle musicEnabled (silent) + menu SFX | toggle + immediate effect | toggle + immediate effect | ignored |
+| Key   | Start  | tooSmall | Playing | Paused | Game Over | Win | Resize-Blocked |
+|-------|--------|----------|---------|--------|-----------|-----|----------------|
+| Arrows/WASD | ignored | ignored | buffer direction | ignored (not buffered) | ignored | ignored | ignored (not buffered) |
+| SPACE | lockGrid, start game + menu SFX | ignored | ignored | ignored | restart + menu SFX | restart + menu SFX | ignored |
+| P     | ignored | ignored | set userPaused, flush buffer, pauseMuted, stop music | clear userPaused, clear pauseMuted, resume music if musicEnabled | ignored | ignored | ignored |
+| M     | initAudio, toggle musicEnabled, immediate start/stop + menu SFX | ignored | toggle + immediate effect + menu SFX | toggle musicEnabled only (silent, pauseMuted active) + menu SFX | toggle + immediate effect + menu SFX | toggle + immediate effect + menu SFX | ignored |
+| click | initAudio | — | — | — | — | — | — |
+
+**Audio suppression flags:**
+| State | `pauseMuted` | `resizeMuted` | Music plays? | SFX play? |
+|-------|-------------|--------------|-------------|----------|
+| Playing | false | false | if `musicEnabled` | yes |
+| Paused | true | false | no | no |
+| Resize-blocked | false | true | no | no |
+| Paused + resize-blocked | true | true | no | no |
+| Game over / Win | false | false | if `musicEnabled` | yes |
 
 ---
 
@@ -715,8 +781,12 @@ Verify every key works correctly on every screen:
 - [ ] Obstacle spawns when no valid cell exists (defers correctly)
 - [ ] Multiple deferred obstacles resolve one per cheese
 - [ ] Obstacle cap reached — pending obstacles discarded
-- [ ] Pause during resize-block — both states preserved
-- [ ] Resume from resize-block while paused — stays paused
+- [ ] Pause during resize-block — both `userPaused` and `resizeBlocked` preserved
+- [ ] Resume from resize-block while paused — stays paused, `pauseMuted` still active
+- [ ] Resize-block audio — music and SFX suppressed via `resizeMuted`
+- [ ] Resize-block recovery — audio resumes only if neither `pauseMuted` nor `resizeMuted`
+- [ ] tooSmall on start screen — resize to fit recovers to start screen
+- [ ] Grid dimensions locked during play — resize never changes gridWidth/gridHeight/cellSize
 - [ ] High score updates on both game-over and win
 - [ ] Music state preserved across restart
 - [ ] First gesture initializes AudioContext (M or SPACE)
