@@ -108,7 +108,8 @@ let state = {
   tickTimer: null,
   particles: [],
   audioCtx: null,
-  audioInitialized: false
+  audioInitialized: false,
+  musicPlaying: false       // whether background music is currently playing
 };
 ```
 
@@ -152,12 +153,12 @@ let state = {
     - `state.resizeBlocked = true`
     - `state.inputBuffer = []` (flush)
     - `clearTimeout(state.tickTimer)` (halt game loop)
-    - Suppress audio (apply `pauseMuted` behavior — see Finding 4)
+    - Set `state.resizeMuted = true`, stop music (do **not** modify `pauseMuted` — resize uses its own independent flag)
     - If viewport < 150x190 → show "Screen too small" text variant
     - Else → show "Window too small — resize to continue"
   - If viewport has recovered and `resizeBlocked` was true:
     - `state.resizeBlocked = false`
-    - Restore audio (clear resize audio suppression)
+    - Set `state.resizeMuted = false`; resume music only if `musicEnabled && !pauseMuted`
     - If `!state.userPaused` and `state.screen === 'playing'` → restart tick loop
     - Else → remain on current screen (paused, gameover, or win)
 - Always re-center canvas via CSS (do not resize it)
@@ -761,7 +762,7 @@ Verify every key works correctly on every screen:
 | SPACE | lockGrid, start game + menu SFX | ignored | ignored | ignored | restart + menu SFX | restart + menu SFX | ignored |
 | P     | ignored | ignored | set userPaused, flush buffer, pauseMuted, stop music | clear userPaused, clear pauseMuted, resume music if musicEnabled | ignored | ignored | ignored |
 | M     | initAudio, toggle musicEnabled, immediate start/stop + menu SFX | ignored | toggle + immediate effect + menu SFX | toggle musicEnabled only (silent, pauseMuted active) + menu SFX | toggle + immediate effect + menu SFX | toggle + immediate effect + menu SFX | ignored |
-| click | initAudio | — | — | — | — | — | — |
+| click | initAudio | — | initAudio | initAudio | initAudio | initAudio | initAudio |
 
 **Audio suppression flags:**
 | State | `pauseMuted` | `resizeMuted` | Music plays? | SFX play? |
