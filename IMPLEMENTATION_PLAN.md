@@ -790,7 +790,7 @@ Verify every key works correctly on every screen:
 - [ ] Grid dimensions locked during play — resize never changes gridWidth/gridHeight/cellSize
 - [ ] High score updates on both game-over and win
 - [ ] Music state preserved across restart
-- [ ] First gesture initializes AudioContext (M or SPACE)
+- [ ] First gesture initializes AudioContext (any keypress — M, SPACE, etc. — or click)
 - [ ] Rapid key input — buffer caps at 3, reversals filtered at dequeue
 
 ---
