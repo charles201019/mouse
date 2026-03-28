@@ -725,7 +725,7 @@ case 'KeyM':
 ```
 
 **Screen-specific behavior:**
-- Start screen: toggle works, immediate effect
+- Start screen: toggle `musicEnabled` only (no music playback yet — music begins on first SPACE)
 - Playing: toggle works, immediate effect
 - Paused: toggle `musicEnabled` only (music stays silent due to `pauseMuted`, but will resume correctly on unpause)
 - Game over / Win: toggle works, immediate start/stop of music
