@@ -159,8 +159,10 @@ let state = {
   - If viewport has recovered and `resizeBlocked` was true:
     - `state.resizeBlocked = false`
     - Set `state.resizeMuted = false`; resume music only if `musicEnabled && !pauseMuted`
-    - If `!state.userPaused` and `state.screen === 'playing'` → restart tick loop
-    - Else → remain on current screen (paused, gameover, or win)
+    - If `state.userPaused`:
+      - Set `state.screen = 'paused'` and render the normal pause overlay (regardless of what screen was active when resize-block started). This covers the case where the player pressed P during resize-block while on the playing screen
+    - Else if `state.screen === 'playing'` → restart tick loop
+    - Else → remain on current screen (gameover or win)
 - Always re-center canvas via CSS (do not resize it)
 
 **Test:** Resize browser window. Canvas resizes on start screen, stays locked during game. "Screen too small" appears on tiny viewports. Recovering from tooSmall on start screen works. Mid-game resize-block activates/deactivates correctly. Grid never changes during play.
